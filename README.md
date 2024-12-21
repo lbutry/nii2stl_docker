@@ -64,10 +64,10 @@ This code is required if you want to skip FreeSurfer, use custom brainstem smoot
 
 ### Arguments and options
 
-- `-t1w` Name of the T1w-image (.nii or .nii.gz) inside the home directory.
+- `-t1w <file name>` Name of the T1w-image (.nii or .nii.gz) inside the home directory.
 - `-fs_skip` Skip FreeSurfer's 'recon-all' and 'segment_subregion brainstem' pipeline. Requires FreeSurfer output to be located in home directory.
 - `-fs_only_brainstem` Perform 'segment_subregion brainstem' and skip 'recon-all'. Requires FreeSurfer output to be located in home directory.
-- `-fs_flags` Parse more flags to 'recon-all'.
+- `-fs_flags <flags>` Parse more flags to 'recon-all'.
 - `-smooth <int>` Number of smoothing steps. Use '0' to disable. [Default = 150]
 - `-decimate <float>` Target number or percentage of faces. Use '0' to disable. [Default = 290000]
 - `-parcels` Create STL-files for each parcel of the Desikan-Killiany Atlas and for each brain lobe.
