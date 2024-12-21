@@ -49,37 +49,38 @@ Open the terminal and run: `docker image pull lbutry/nii2stl:latest`
 2) Copy your FreeSurfer 'license.txt' file and your brain T1w image (.nii or .nii.gz) into the folder
 - Navigate inside the terminal to the folder: `cd /path/to/folder`
 
-**Usage:** `docker run -t -v ./:/app/share <image> <options>`. 
+**Usage:** `docker run -t -v ./:/app/share <image> <options>`
 
 **Example for default use**
 - Mac/Linux: `docker run -t -v ./:/app/share lbutry/nii2stl -t1w brain.nii.gz`
 - Windows: `docker run -t -v .\/:/app/share lbutry/nii2stl -t1w brain.nii.gz`
 
 **Example for advances use**
+
 This code is required if you want to skip FreeSurfer, use custom brainstem smoothing and obtain an STL file for each brain lobe:
 - Mac/Linux: `docker run -t -v ./:/app/share lbutry/nii2stl -fs_skip -smoothing 0 -parcels`
 - Windows: `docker run -t -v .\/:/app/share lbutry/nii2stl -fs_skip -smoothing 0 -parcels`
 
 ### Arguments and options
 
-- **-t1w** Name of the T1w-image (.nii or .nii.gz) inside the home directory.
-- **-fs_skip** Skip FreeSurfer's 'recon-all' and 'segment_subregion brainstem' pipeline. Requires FreeSurfer output to be located in home directory.
-- **-fs_only_brainstem** Perform 'segment_subregion brainstem' and skip 'recon-all'. Requires FreeSurfer output to be located in home directory.
-- **-fs_flags** Parse more flags to 'recon-all'.
-- **-smooth** Number of smoothing steps. Use '0' to disable. [Default = 150]
-- **-decimate** Target number or percentage of faces. Use '0' to disable. [Default = 290000]
-- **-parcels** Create STL-files for each parcel of the Desikan-Killiany Atlas and for each brain lobe.
+- `-t1w` Name of the T1w-image (.nii or .nii.gz) inside the home directory.
+- `-fs_skip` Skip FreeSurfer's 'recon-all' and 'segment_subregion brainstem' pipeline. Requires FreeSurfer output to be located in home directory.
+- `-fs_only_brainstem` Perform 'segment_subregion brainstem' and skip 'recon-all'. Requires FreeSurfer output to be located in home directory.
+- `-fs_flags` Parse more flags to 'recon-all'.
+- `-smooth` Number of smoothing steps. Use '0' to disable. [Default = 150]
+- `-decimate` Target number or percentage of faces. Use '0' to disable. [Default = 290000]
+- `-parcels` Create STL-files for each parcel of the Desikan-Killiany Atlas and for each brain lobe.
 
 ### Output
 
 All outputs are saved in the home directory.
 
-- **home/freesurfer** Segmentation output of FreeSurfer.
-- **home/output/brain_final.stl** 3D-printable model of the whole brain.
-- **home/output/cortical_final.stl** 3D-printable model of the cerebrum.
-- **home/output/subcortical_final.stl** 3D-printable model of the brainstem and cerebellum.
-- **home/output/lobes** STL-files for each brain lobe.
-- **home/output/parcels** STL-files for each parcel of the Desikan-Killiany Atlas.
+- `home/freesurfer` Segmentation output of FreeSurfer.
+- `home/output/brain_final.stl` 3D-printable model of the whole brain.
+- `home/output/cortical_final.stl` 3D-printable model of the cerebrum.
+- `home/output/subcortical_final.stl` 3D-printable model of the brainstem and cerebellum.
+- `home/output/lobes` STL-files for each brain lobe.
+- `home/output/parcels` STL-files for each parcel of the Desikan-Killiany Atlas.
 
 # Q & A
 
