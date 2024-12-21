@@ -30,15 +30,16 @@ Download and install [Docker Desktop](https://www.docker.com/products/docker-des
 
 ## 3. Pull the Docker image
 
-**3.1. Option A: via Terminal**
+**Option A: via Terminal**
+
 Open the terminal and run: `docker image pull lbutry/nii2stl:latest`
 
-**3.2. Option B: via Docker Desktop app**
+**Option B: via Docker Desktop app**
 1) Open 'Docker Desktop'
 2) Navigate to the search bar at the top and type 'lbutry/nii2stl'.
 3) Click on 'Pull' to download the image.
 
-**3.3. Option C: Build manually from this repository**
+**Option C: Build manually from this repository**
 1) Clone this repository
 2) Open the repository folder with the terminal
 3) Run `docker build -t nii2stl .`
