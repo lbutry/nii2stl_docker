@@ -48,7 +48,7 @@ Open the terminal and run: `docker image pull lbutry/nii2stl:latest`
 
 1) Create a new folder (e.g.: home)
 2) Copy your FreeSurfer 'license.txt' file and your brain T1w image (.nii or .nii.gz) into the folder
-- Navigate inside the terminal to the folder: `cd /path/to/folder`
+3) Navigate inside the terminal to the folder: `cd /path/to/folder`
 
 **Usage:** `docker run -t -v ./:/app/share <image> <options>`
 
@@ -56,7 +56,7 @@ Open the terminal and run: `docker image pull lbutry/nii2stl:latest`
 - Mac/Linux: `docker run -t -v ./:/app/share lbutry/nii2stl -t1w brain.nii.gz`
 - Windows: `docker run -t -v .\/:/app/share lbutry/nii2stl -t1w brain.nii.gz`
 
-**Example for advances use**
+**Example for advanced use**
 
 This code is required if you want to skip FreeSurfer, use custom brainstem smoothing and obtain an STL file for each brain lobe:
 - Mac/Linux: `docker run -t -v ./:/app/share lbutry/nii2stl -fs_skip -smoothing 0 -parcels`
