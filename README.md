@@ -49,12 +49,15 @@ Open the terminal and run: `docker image pull lbutry/nii2stl:latest`
 1) Create a new folder (e.g.: home)
 2) Copy your FreeSurfer 'license.txt' file and your brain T1w image (.nii or .nii.gz) into the folder
 3) Navigate inside the terminal to the folder: `cd /path/to/folder`
+4) Run the command below
 
 **Usage:** `docker run -t -v ./:/app/share <image> <options>`
 
 **Example for default use**
 - Mac/Linux: `docker run -t -v ./:/app/share lbutry/nii2stl -t1w brain.nii.gz`
 - Windows: `docker run -t -v .\/:/app/share lbutry/nii2stl -t1w brain.nii.gz`
+
+The default run will take several hours to complete.
 
 **Example for advanced use**
 
