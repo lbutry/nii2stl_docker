@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys 
 import argparse
 import pymeshlab
 import numpy as np
@@ -22,19 +23,23 @@ parser.add_argument('-parcels', action='store_true', help='Create STL files for 
 args = parser.parse_args()
 
 # Validate arguments & files
-if not args.fs_skip and not args.t1w:
+if not (args.fs_skip or args.fs_only_brainstem) and not args.t1w:
     parser.error('The following arguments are required: -t1w (unless -fs_skip is set)')
+    sys.exit(1)  # Ensure the script exits
 
 if not os.path.exists('/app/share/license.txt'):
     parser.error("The FreeSurfer's 'license.txt' file is missing in the home directory")
+    sys.exit(1)  # Ensure the script exits
 
 if args.fs_skip:
     if not os.path.exists('/app/share/freesurfer/mri/brainstemSsLabels.FSvoxelSpace.mgz'):
         parser.error("The folder 'freesurfer' is missing in the home directory or does not contain segmentation data from 'recon-all' & 'segment_subregions brainstem'")
+        sys.exit(1)  # Ensure the script exits
 
 if args.fs_only_brainstem:
     if not os.path.exists('/app/share/freesurfer/surf/lh.pial'):
         parser.error("The folder 'freesurfer' is missing in the home directory or does not contain segmentation data from 'recon-all'")
+        sys.exit(1)  # Ensure the script exits
         
 #===========================================================#
 # CREATE WORK & OUTPUT DIRECTORY, SET ENV VARIABLES
