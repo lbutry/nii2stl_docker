@@ -1,6 +1,6 @@
 # 3D-printable brain model from a T1w MR image using Docker
 
-You want to 3D print your or another ones brain? Here's a step by step guide on how to end up with a 3D-printable brain model. It's as easy as running two command lines. This is an adaptation and extension of [skjerns/3dprintedbrain_docker](https://github.com/skjerns/3dprintedbrain_docker) and [miykael/3dprintyourbrain](https://github.com/miykael/3dprintyourbrain) with more options and ease of use.
+You want to 3D print your or another ones brain? Here's a step by step guide on how to end up with a 3D-printable brain model. It's as easy as running two command lines. This is an adaptation and extension of [skjerns/3dprintedbrain_docker](https://github.com/skjerns/3dprintedbrain_docker) and [miykael/3dprintyourbrain](https://github.com/miykael/3dprintyourbrain) with more options, ease of use and better brainstem segmentation.
 
 **What you need**
 - Structural brain image (T1-weighted) in NIfTI-format
@@ -8,15 +8,15 @@ You want to 3D print your or another ones brain? Here's a step by step guide on 
 - Installation of 'Docker Desktop' (see Instructions)
 
 # Features
-- Easy installation & command usage (just two commands)
-- Also works with previously generated FreeSurfer output.
-- More accurate subcortical segmentation by not only utilizing FreeSurfer's 'recon-all' but also 'segment_subregions'.
-- Option to obtain an STL-file for each parcel of the Desikan-Killiany Atlas and for each brain lobe. [BETA]
-- Outputs a subcortical, cortical and whole brain STL-file.
+- Simplified installation and usage — just two commands to get started.
+- Compatible with pre-existing FreeSurfer [7.3+] output.
+- Generates print-ready STL files for subcortical structures, cortical regions, and the whole brain.
+- Enhanced subcortical segmentation by leveraging both FreeSurfer's recon-all and segment_subregions processes.
+- Option to create separate STL files for each hemisphere.
+- [BETA] Option to generate STL files for parcels of the Desikan-Killiany Atlas and brain lobes.
 - Smaller Docker image (20.46 GB)
-- Options to control subcortical smoothing and overall number of faces.
-- Technical feature: Does not require FSL anymore
-- Technical feature: Program is run from one python file.
+- Technical feature: No longer requires FSL as a dependency.
+- Technical feature: Runs entirely from a single Python file
 
 # Instructions
 
@@ -51,7 +51,7 @@ Open the terminal and run: `docker image pull lbutry/nii2stl:latest`
 3) Navigate inside the terminal to the folder: `cd /path/to/folder`
 4) Run the command below
 
-**Usage:** `docker run -t -v ./:/app/share <image> <options>`
+**Usage:** `docker run -t -v ./:/app/share <image name> <options>`
 
 **Example for default use**
 - Mac/Linux: `docker run -t -v ./:/app/share lbutry/nii2stl -t1w brain.nii.gz`
@@ -61,30 +61,49 @@ The default run will take several hours to complete.
 
 **Example for advanced use**
 
-This code is required if you want to skip FreeSurfer, use custom brainstem smoothing and obtain an STL file for each brain lobe:
-- Mac/Linux: `docker run -t -v ./:/app/share lbutry/nii2stl -fs_skip -smoothing 0 -parcels`
-- Windows: `docker run -t -v .\/:/app/share lbutry/nii2stl -fs_skip -smoothing 0 -parcels`
+This code is required if you want to e.g. skip FreeSurfer, use custom brainstem smoothing and obtain an STL file for each hemissphere:
+- Mac/Linux: `docker run -t -v ./:/app/share lbutry/nii2stl -fs_skip -smoothing 0 -hemi`
+- Windows: `docker run -t -v .\/:/app/share lbutry/nii2stl -fs_skip -smoothing 0 -hemi`
 
 ### Arguments and options
 
+**Mandatory for default use**
+
 - `-t1w <file name>` Name of the T1w-image (.nii or .nii.gz) inside the home directory.
+
+**Freesurfer options**
+
 - `-fs_skip` Skip FreeSurfer's 'recon-all' and 'segment_subregion brainstem' pipeline. Requires FreeSurfer output to be located in home directory.
 - `-fs_only_brainstem` Perform 'segment_subregion brainstem' and skip 'recon-all'. Requires FreeSurfer output to be located in home directory.
 - `-fs_flags <flags>` Parse more flags to 'recon-all'.
-- `-smooth <int>` Number of smoothing steps. Use '0' to disable. [Default = 150]
-- `-decimate <float>` Target number or percentage of faces. Use '0' to disable. [Default = 290000]
-- `-parcels` Create STL-files for each parcel of the Desikan-Killiany Atlas and for each brain lobe.
+
+**Mesh processing options**
+
+- `-smooth <int>` Number of smoothing steps for subcortical model. Use '0' to disable. [Default = 150]
+- `-decimate <float>` Target number of faces. Use '0' to disable. [Default = 150000]
+
+**Optional modules**
+
+- `-hemi` Create STL-file for each hemissphere. Including brainstem, cerebellum and corpus callosum.
+- `-planeoffset` Indicate where the subcotical model is cut in half on the x-axis. Only applicable when -hemi is set.
+- `-parcels` [BETA] Create STL-file for each parcel of the Desikan-Killiany Atlas and for each brain lobe.
+
+**General options**
+
+- `-work` Keep work directory. 
+
 
 ### Output
 
 All outputs are saved in the home directory.
 
-- `home/freesurfer` Segmentation output of FreeSurfer.
-- `home/output/brain_final.stl` 3D-printable model of the whole brain.
-- `home/output/cortical_final.stl` 3D-printable model of the cerebrum.
+- `home/freesurfer/` Segmentation output of FreeSurfer.
+- `home/output/brain_final.stl` 3D-printable STL model of the whole brain.
+- `home/output/cortical_final.stl` 3D-printable STL model of the cerebrum.
 - `home/output/subcortical_final.stl` 3D-printable model of the brainstem and cerebellum.
-- `home/output/lobes` STL-files for each brain lobe.
-- `home/output/parcels` STL-files for each parcel of the Desikan-Killiany Atlas.
+- `home/output/hemi/` 3D-printable STL model for both hemisspheres.
+- `home/output/lobes/` 3D-printable STL model for each brain lobe.
+- `home/output/parcels/` 3D-printable STL model for each parcel of the Desikan-Killiany Atlas.
 
 # Q & A
 

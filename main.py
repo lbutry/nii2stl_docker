@@ -2,57 +2,67 @@ import os
 import shutil
 import sys 
 import argparse
+import logging
 import pymeshlab
 import numpy as np
 import nibabel.freesurfer as fsio
 
 #===========================================================#
-# SETUP ARGUMENTS PARSER
+# SETUP ARGUMENTS PARSER & LOGGING
 #===========================================================#
 
+# Configure logging
+logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Set parser
 parser = argparse.ArgumentParser()
 
 parser.add_argument('-t1w', type=str, help='Name of the T1w-image (.nii or .nii.gz) inside the home directory.')
 parser.add_argument('-fs_skip', action='store_true', help="Skip FreeSurfer's 'recon-all' and 'segment_subregion brainstem' pipeline. Requires FreeSurfer output to be located in home directory.")
 parser.add_argument('-fs_only_brainstem', action='store_true', help="Perform 'segment_subregion brainstem' and skip 'recon-all'. Requires FreeSurfer output to be located in home directory.")
 parser.add_argument('-fs_flags', type=str, default = '', help="Parse more flags to 'recon-all'")
-parser.add_argument('-smooth', type=int, default = 150, help="Number of smoothing steps. Use '0' to disable")
-parser.add_argument('-decimate', type=float, default = 290000, help="Target number or percentage of faces. Use '0' to disable")
+parser.add_argument('-smooth', type=int, default = 150, help="Number of smoothing steps for subcortical model. Use '0' to disable")
+parser.add_argument('-decimate', type=float, default = 150000, help="Target number of faces. Use '0' to disable")
 parser.add_argument('-parcels', action='store_true', help='Create STL files for each parcel of the Desikan-Killiany Atlas and for each brain lobe.')
+parser.add_argument('-hemi', action='store_true', help='Create STL files for each hemissphere.')
+parser.add_argument('-planeoffset', type=float, default=None, help='Indicates where the subcotical model is cut in half on the x-axis. Only applicable when -hemi is set.')
+parser.add_argument('-work', action='store_true', help='Keep work directory.')
 
 args = parser.parse_args()
 
 # Validate arguments & files
 if not (args.fs_skip or args.fs_only_brainstem) and not args.t1w:
-    parser.error('The following arguments are required: -t1w (unless -fs_skip is set)')
-    sys.exit(1)  # Ensure the script exits
+    logging.error('The following arguments are required: -t1w (unless -fs_skip is set)')
+    sys.exit(1)
 
 if not os.path.exists('/app/share/license.txt'):
-    parser.error("The FreeSurfer's 'license.txt' file is missing in the home directory")
-    sys.exit(1)  # Ensure the script exits
+    logging.error("The FreeSurfer's 'license.txt' file is missing in the home directory")
+    sys.exit(1)
 
 if args.fs_skip:
     if not os.path.exists('/app/share/freesurfer/mri/brainstemSsLabels.FSvoxelSpace.mgz'):
-        parser.error("The folder 'freesurfer' is missing in the home directory or does not contain segmentation data from 'recon-all' & 'segment_subregions brainstem'")
-        sys.exit(1)  # Ensure the script exits
+        logging.error("The folder 'freesurfer' is missing in the home directory or does not contain segmentation data from 'recon-all' & 'segment_subregions brainstem'")
+        sys.exit(1)
 
 if args.fs_only_brainstem:
     if not os.path.exists('/app/share/freesurfer/surf/lh.pial'):
-        parser.error("The folder 'freesurfer' is missing in the home directory or does not contain segmentation data from 'recon-all'")
-        sys.exit(1)  # Ensure the script exits
+        logging.error("The folder 'freesurfer' is missing in the home directory or does not contain segmentation data from 'recon-all'")
+        sys.exit(1)
         
 #===========================================================#
 # CREATE WORK & OUTPUT DIRECTORY, SET ENV VARIABLES
 #===========================================================#
 
-# set directories inside share folder between docker & host
+# Set directories paths (inside share folder between docker & host)
 share_dir  = os.path.join(os.getcwd(), 'share')
 work_dir   = os.path.join(share_dir, 'work')
 output_dir = os.path.join(share_dir, 'output')
 
+# Create directories if they don't exist
 os.makedirs(work_dir, exist_ok=True)
 os.makedirs(output_dir, exist_ok=True)
 
+# Set environmental varibales
 os.environ['FS_LICENSE'] = '/app/share/license.txt'
 os.environ['SUBJECTS_DIR'] = share_dir
 
@@ -75,6 +85,8 @@ if args.fs_only_brainstem:
 # CREATE CORTICAL MODEL
 #===========================================================#
 
+print('## CREATE CORTICAL AND SUBCORTICAL MODEL ##')
+
 lh_pial = os.path.join(share_dir, 'freesurfer/surf/lh.pial')
 rh_pial = os.path.join(share_dir, 'freesurfer/surf/rh.pial')
 cortical_stl = os.path.join(output_dir, 'cortical_final.stl')
@@ -84,14 +96,12 @@ os.system(f'mris_convert --combinesurfs {lh_pial} {rh_pial} {cortical_stl}')
 # CREATE SUBCORTICAL MODEL
 #===========================================================#
 
-print('## CREATE CORTICAL AND SUBCORTICAL MODEL ##')
-
-# Cerebellum
+# Cerebellum, corpus callosum, thalamus
 cerebellum_mgz = os.path.join(share_dir, 'freesurfer/mri/aseg.mgz')
 cerebellum_bin = os.path.join(work_dir, 'cerebellum_bin.nii.gz')
 cerebellum_surf = os.path.join(work_dir, 'cerebellum.pial')
 cerebellum_stl = os.path.join(work_dir, 'cerebellum.stl')
-os.system(f'mri_binarize --i {cerebellum_mgz} --match 6 7 8 45 46 47 --o {cerebellum_bin}')
+os.system(f'mri_binarize --i {cerebellum_mgz} --match 6 7 8 10 45 46 47 49 250 251 252 253 254 255 --o {cerebellum_bin}')
 os.system(f'mri_tessellate {cerebellum_bin} 1 {cerebellum_surf}')
 os.system(f'mris_convert {cerebellum_surf} {cerebellum_stl}')
 
@@ -105,53 +115,145 @@ os.system(f'mri_tessellate {brainstem_bin} 1 {brainstem_surf}')
 os.system(f'mris_convert {brainstem_surf} {brainstem_stl}')
 
 #===========================================================#
-# SMOOTH & COMBINE MODELS & DECIMATE VIA PYMESHLAB
+# MESH PROCESSING VIA PYMESHLAB
 #===========================================================#
 
-print('## APPLY FURTHER PROCESSING AS REQUESTED ##')
-
-ms = pymeshlab.MeshSet()
+print('## APPLY MESH PROCESSING VIA PYMESHLAB ##')
 
 # Combine cerebellum & brainstem
-ms.load_new_mesh(cerebellum_stl)
+ms = pymeshlab.MeshSet()
 ms.load_new_mesh(brainstem_stl)
-ms.apply_filter('flatten_visible_layers', mergevisible=True)
+ms.load_new_mesh(cerebellum_stl)
+ms.mesh_boolean_union()
+subcortical_stl = os.path.join(output_dir, 'subcortical_final.stl')
+ms.save_current_mesh(subcortical_stl)
 
-# Smoothing
+## Resolve non-manifold mesh
+ms = pymeshlab.MeshSet()
+ms.load_new_mesh(subcortical_stl)
+ms.uniform_mesh_resampling(cellsize=pymeshlab.Percentage(1))
+ms.remove_isolated_pieces_wrt_diameter()
+ms.save_current_mesh(subcortical_stl)
+
+# Smoothing subcortical model
 if args.smooth:
-    print(f'## Smoothing cerebellum & brainstem with {args.smooth} steps ##')
-    ms.apply_filter('scaledependent_laplacian_smooth', stepsmoothnum=args.smooth, 
-    delta=pymeshlab.Percentage(0.1))
+    ms.scaledependent_laplacian_smooth(stepsmoothnum=args.smooth, delta=pymeshlab.Percentage(0.1))
+    ms.save_current_mesh(subcortical_stl)
+    print(f'## Smoothed cerebellum & brainstem with {args.smooth} steps ##')
 else:
     print('## No smoothing requested ##')
 
-ms.save_current_mesh(os.path.join(output_dir, 'subcortical_final.stl'))
-
-# Combine subcortical & cortical
+# Smooth cortical model
+ms = pymeshlab.MeshSet()
 ms.load_new_mesh(cortical_stl)
-ms.apply_filter('flatten_visible_layers', mergevisible=True)
-ms.apply_filter('merge_close_vertices', )  # closing holes
+ms.laplacian_smooth(stepsmoothnum=1)
+ms.save_current_mesh(cortical_stl)
 
-# Decimate    
+# Combine subcortical & cortical model
+ms.load_new_mesh(subcortical_stl)
+ms.mesh_boolean_union()
+
+# Decimate combined model
 if args.decimate:
-    if args.decimate < 1:  # Treat as percentage
-        print(f'## Decimating mesh to {args.decimate * 100} % of original ##')
-        ms.apply_filter('simplification_quadric_edge_collapse_decimation', targetperc=args.decimate, preserveboundary=True, boundaryweight=2)
-    else:  # Treat as target face number
-        print(f'## Decimating mesh to {args.decimate} faces ##')
-        ms.apply_filter('simplification_quadric_edge_collapse_decimation', targetfacenum=int(args.decimate), preserveboundary=True, boundaryweight=2)
+    ms.simplification_quadric_edge_collapse_decimation(targetfacenum=int(args.decimate), preserveboundary=True, preservetopology=True, boundaryweight=2)
+    print(f'## Decimated mesh to {args.decimate} faces ##')
 else:
     print('## No decimation requested ##')
 
-ms.save_current_mesh(os.path.join(output_dir, 'brain_final.stl'))
+# Save final model
+final_stl = os.path.join(output_dir, 'brain_final.stl')
+ms.save_current_mesh(final_stl)
+
+#===========================================================#
+# CREATE MODEL FOR EACH HEMISSPHERE
+#===========================================================#
+
+if args.hemi:
+
+    print('## CREATE MODEL FOR EACH HEMISSPHERE ##')
+
+    # Create output folder
+    hemi_dir = os.path.join(output_dir, 'hemi')
+    os.makedirs(hemi_dir, exist_ok=True)
+
+    # Cortical model
+    lh_stl = os.path.join(hemi_dir, 'left_hemi.stl')
+    rh_stl = os.path.join(hemi_dir, 'right_hemi.stl')
+    os.system(f'mris_convert {lh_pial}  {lh_stl}')
+    os.system(f'mris_convert {rh_pial}  {rh_stl}')
+
+    # Get value for 'planeoffset' argument    
+    offset_x = args.planeoffset if args.planeoffset is not None else ms.compute_geometric_measures()['center_of_mass'][0]
+
+    # Split subcortical model in half
+    ms = pymeshlab.MeshSet()
+    ms.load_new_mesh(subcortical_stl)
+    ms.compute_planar_section(planeoffset=offset_x, splitsurfacewithsection=True, createsectionsurface=True)
+    print(f'## The subcortical model was splitted at x-planeoffset: {offset_x} ##')
+
+    ms.set_current_mesh(2)
+    section = os.path.join(work_dir, 'section.stl')
+    ms.save_current_mesh(section)
+    ms.set_current_mesh(3)
+    right_subc = os.path.join(work_dir, 'right_subc.stl')
+    ms.save_current_mesh(right_subc)
+    ms.set_current_mesh(4)
+    left_subc = os.path.join(work_dir, 'left_subc.stl')
+    ms.save_current_mesh(left_subc)
+
+    ## Close hole
+    def process_subc(subc_stl):
+        ms = pymeshlab.MeshSet()
+        ms.load_new_mesh(section)
+
+        if (offset_x > 0 and subc_stl == right_subc) or (offset_x < 0 and subc_stl == left_subc):
+            ms.invert_faces_orientation()
+
+        ms.load_new_mesh(subc_stl)
+        ms.flatten_visible_layers()
+        ms.save_current_mesh(subc_stl)
+
+    process_subc(left_subc)
+    process_subc(right_subc)
+
+    # Smooth cortical model; Combine subcortical & cortical model of each hemisphere; clean edge between hemisspheres
+    def process_hemi(hemi_stl, subc_stl, opposing_subc):
+        ms = pymeshlab.MeshSet()
+        ms.load_new_mesh(hemi_stl)
+        ms.laplacian_smooth(stepsmoothnum=1)
+        ms.load_new_mesh(subc_stl)
+        ms.mesh_boolean_union()
+        ms.load_new_mesh(opposing_subc)
+        ms.mesh_boolean_difference(first_mesh=2, second_mesh=3)
+        ms.save_current_mesh(hemi_stl)
+
+    process_hemi(lh_stl, left_subc, right_subc)
+    process_hemi(rh_stl, right_subc, left_subc)
+
+    # Clean hemissphere models
+    def clean_hemi(hemi_stl):
+        ms = pymeshlab.MeshSet()
+        ms.load_new_mesh(hemi_stl)
+        ms.remove_isolated_pieces_wrt_diameter()
+        ms.save_current_mesh(hemi_stl)
+
+    clean_hemi(lh_stl)
+    clean_hemi(rh_stl)
+
+    # Stop hemis from overlapping (by computing difference)
+    ms = pymeshlab.MeshSet()
+    ms.load_new_mesh(lh_stl)
+    ms.load_new_mesh(rh_stl)
+    ms.mesh_boolean_difference()
+    ms.save_current_mesh(rh_stl)
 
 #===========================================================#
 # CREATE MODEL FOR EACH CORTICAL PARCEL & LOBE
 #===========================================================#
 
-print('## PARCELLATE BRAIN INTO REGIONS AND LOBES ##')
-
 if args.parcels:
+
+    print('## CREATE MODEL FOR EACH CORTICAL PARCEL & LOBE ##')
 
     # Create folders
     pial_dir    = os.path.join(work_dir, 'pial')
@@ -202,7 +304,7 @@ if args.parcels:
                 path_stl = os.path.join(parcels_dir, f'{hemi}_{region}.stl')
                 ms.load_new_mesh(path_stl)
 
-            ms.apply_filter('flatten_visible_layers', mergevisible=True)
+            ms.flatten_visible_layers()
             ms.save_current_mesh(os.path.join(lobes_dir, f'{hemi}_lobe-{lobe_name}.stl'))
 
 #===========================================================#
@@ -210,7 +312,10 @@ if args.parcels:
 #===========================================================#
 
 # Remove work directory
-shutil.rmtree(work_dir)
+if args.work:
+    print(f'## Keeping work directory ##')
+else:
+    shutil.rmtree(work_dir)
 
 # End text
 print('''
