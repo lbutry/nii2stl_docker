@@ -24,8 +24,10 @@ parser.add_argument('-fs_flags', type=str, default = '', help="Parse more flags 
 parser.add_argument('-smooth', type=int, default = 150, help="Number of smoothing steps for subcortical model. Use '0' to disable")
 parser.add_argument('-decimate', type=float, default = 150000, help="Target number of faces. Use '0' to disable")
 parser.add_argument('-parcels', action='store_true', help='Create STL files for each parcel of the Desikan-Killiany Atlas and for each brain lobe.')
-parser.add_argument('-hemi', action='store_true', help='Create STL files for each hemissphere.')
-parser.add_argument('-planeoffset', type=float, default=None, help='Indicates where the subcotical model is cut in half on the x-axis. Only applicable when -hemi is set.')
+parser.add_argument('-hemi', action='store_true', help='Create STL files for each hemisphere.')
+parser.add_argument('-planeoffset', type=float, default=None, help='Indicate where the subcotical model is cut in half on the x-axis. Only applicable when -hemi is set.')
+parser.add_argument('-rev_overlap_correction', action='store_true', help='Indicate if hemi overlap correction should swap the subtraction terms.')
+parser.add_argument('-wm', action='store_true', help='Create STL file for cerebral white matter.')
 parser.add_argument('-work', action='store_true', help='Keep work directory.')
 
 args = parser.parse_args()
@@ -96,23 +98,26 @@ os.system(f'mris_convert --combinesurfs {lh_pial} {rh_pial} {cortical_stl}')
 # CREATE SUBCORTICAL MODEL
 #===========================================================#
 
-# Cerebellum, corpus callosum, thalamus
-cerebellum_mgz = os.path.join(share_dir, 'freesurfer/mri/aseg.mgz')
-cerebellum_bin = os.path.join(work_dir, 'cerebellum_bin.nii.gz')
-cerebellum_surf = os.path.join(work_dir, 'cerebellum.pial')
-cerebellum_stl = os.path.join(work_dir, 'cerebellum.stl')
-os.system(f'mri_binarize --i {cerebellum_mgz} --match 6 7 8 10 45 46 47 49 250 251 252 253 254 255 --o {cerebellum_bin}')
-os.system(f'mri_tessellate {cerebellum_bin} 1 {cerebellum_surf}')
-os.system(f'mris_convert {cerebellum_surf} {cerebellum_stl}')
+def mgz2stl(input_mgz, output_prefix, match_values):
+    mgz = os.path.join(share_dir, input_mgz)
+    bin = os.path.join(work_dir, f'{output_prefix}_bin.nii.gz')
+    surf = os.path.join(work_dir, f'{output_prefix}.pial')
+    stl = os.path.join(work_dir, f'{output_prefix}.stl')
+    os.system(f'mri_binarize --i {mgz} --match {match_values} --o {bin}')
+    os.system(f'mri_tessellate {bin} 1 {surf}')
+    os.system(f'mris_convert {surf} {stl}')
+
+# Cerebellum, Thalamus, VentralDC, Fornix, Corpus callosum
+sub_stl = os.path.join(work_dir, 'sub.stl')
+mgz2stl('freesurfer/mri/aseg.mgz', 'sub', '6 7 8 10 28 45 46 47 49 60 250 251 252 253 254 255')
 
 # Brainstem
-brainstem_mgz = os.path.join(share_dir, 'freesurfer/mri/brainstemSsLabels.FSvoxelSpace.mgz')
-brainstem_bin = os.path.join(work_dir, 'brainstem_bin.mgz')
-brainstem_surf = os.path.join(work_dir, 'brainstem.pial')
 brainstem_stl = os.path.join(work_dir, 'brainstem.stl')
-os.system(f'mri_binarize --i {brainstem_mgz} --match 170 171 172 173 174 175 177 178 179 --o {brainstem_bin}')
-os.system(f'mri_tessellate {brainstem_bin} 1 {brainstem_surf}')
-os.system(f'mris_convert {brainstem_surf} {brainstem_stl}')
+mgz2stl('freesurfer/mri/brainstemSsLabels.FSvoxelSpace.mgz', 'brainstem', '170 171 172 173 174 175 177 178 179')
+
+## Ventricels (for subtraction)
+ventricle_stl = os.path.join(work_dir, 'ventrical.stl')
+mgz2stl('freesurfer/mri/aseg.mgz', 'ventrical', '4 14 15 43 72')
 
 #===========================================================#
 # MESH PROCESSING VIA PYMESHLAB
@@ -120,32 +125,39 @@ os.system(f'mris_convert {brainstem_surf} {brainstem_stl}')
 
 print('## APPLY MESH PROCESSING VIA PYMESHLAB ##')
 
-# Combine cerebellum & brainstem
+# Combine subcortical & brainstem
 ms = pymeshlab.MeshSet()
 ms.load_new_mesh(brainstem_stl)
-ms.load_new_mesh(cerebellum_stl)
+ms.load_new_mesh(sub_stl)
 ms.mesh_boolean_union()
+
+# Subtract ventricle from subcortical
+ms.load_new_mesh(ventricle_stl)
+ms.mesh_boolean_difference(first_mesh=2, second_mesh=3)
 subcortical_stl = os.path.join(output_dir, 'subcortical_final.stl')
 ms.save_current_mesh(subcortical_stl)
 
-## Resolve non-manifold mesh
-ms = pymeshlab.MeshSet()
-ms.load_new_mesh(subcortical_stl)
-ms.uniform_mesh_resampling(cellsize=pymeshlab.Percentage(1))
-ms.remove_isolated_pieces_wrt_diameter()
-ms.save_current_mesh(subcortical_stl)
+def process_mesh(mesh_stl):
+    ## Resolve non-manifold mesh
+    ms = pymeshlab.MeshSet()
+    ms.load_new_mesh(mesh_stl)
+    ms.uniform_mesh_resampling(cellsize=pymeshlab.Percentage(1))
+    ms.remove_isolated_pieces_wrt_diameter()
+    ms.save_current_mesh(mesh_stl)
 
-# Smoothing subcortical model
-if args.smooth:
-    ms.scaledependent_laplacian_smooth(stepsmoothnum=args.smooth, delta=pymeshlab.Percentage(0.1))
-    ms.save_current_mesh(subcortical_stl)
-    print(f'## Smoothed cerebellum & brainstem with {args.smooth} steps ##')
-else:
-    print('## No smoothing requested ##')
+    # Smooth
+    if args.smooth and mesh_stl == subcortical_stl:
+        ms.scaledependent_laplacian_smooth(stepsmoothnum=args.smooth, delta=pymeshlab.Percentage(0.1))
+        ms.save_current_mesh(mesh_stl)
 
-# Smooth cortical model
+process_mesh(subcortical_stl)
+process_mesh(ventricle_stl)
+
+# Subtract ventricles from cortical & smooth
 ms = pymeshlab.MeshSet()
 ms.load_new_mesh(cortical_stl)
+ms.load_new_mesh(ventricle_stl)
+ms.mesh_boolean_difference(first_mesh=0, second_mesh=1)
 ms.laplacian_smooth(stepsmoothnum=1)
 ms.save_current_mesh(cortical_stl)
 
@@ -156,21 +168,44 @@ ms.mesh_boolean_union()
 # Decimate combined model
 if args.decimate:
     ms.simplification_quadric_edge_collapse_decimation(targetfacenum=int(args.decimate), preserveboundary=True, preservetopology=True, boundaryweight=2)
-    print(f'## Decimated mesh to {args.decimate} faces ##')
-else:
-    print('## No decimation requested ##')
+
+# Clean model
+ms.close_holes()
+ms.remove_isolated_pieces_wrt_diameter()
 
 # Save final model
 final_stl = os.path.join(output_dir, 'brain_final.stl')
 ms.save_current_mesh(final_stl)
 
 #===========================================================#
-# CREATE MODEL FOR EACH HEMISSPHERE
+# CREATE MODEL FOR WHITE MATTER
+#===========================================================#
+
+if args.wm:
+
+    # Create output folder
+    wm_dir = os.path.join(output_dir, 'wm')
+    os.makedirs(wm_dir, exist_ok=True)
+    
+    # Create WM model
+    wm_stl = os.path.join(work_dir, 'wm.stl')
+    mgz2stl('freesurfer/mri/aseg.mgz', 'wm', '2 41 250 251 252 253 254 255')
+
+    # Process mesh
+    process_mesh(wm_stl)
+    ms = pymeshlab.MeshSet()
+    ms.load_new_mesh(wm_stl)
+    ms.scaledependent_laplacian_smooth(stepsmoothnum=120, delta=pymeshlab.Percentage(0.))
+    wm_final = os.path.join(wm_dir, 'wm.stl')
+    ms.save_current_mesh(wm_final)
+
+#===========================================================#
+# CREATE MODEL FOR EACH HEMISPHERE
 #===========================================================#
 
 if args.hemi:
 
-    print('## CREATE MODEL FOR EACH HEMISSPHERE ##')
+    print('## CREATE MODEL FOR EACH HEMISPHERE ##')
 
     # Create output folder
     hemi_dir = os.path.join(output_dir, 'hemi')
@@ -182,14 +217,13 @@ if args.hemi:
     os.system(f'mris_convert {lh_pial}  {lh_stl}')
     os.system(f'mris_convert {rh_pial}  {rh_stl}')
 
-    # Get value for 'planeoffset' argument    
+    # Get value for 'planeoffset' argument (middle of whole brain model)
     offset_x = args.planeoffset if args.planeoffset is not None else ms.compute_geometric_measures()['center_of_mass'][0]
 
     # Split subcortical model in half
     ms = pymeshlab.MeshSet()
     ms.load_new_mesh(subcortical_stl)
     ms.compute_planar_section(planeoffset=offset_x, splitsurfacewithsection=True, createsectionsurface=True)
-    print(f'## The subcortical model was splitted at x-planeoffset: {offset_x} ##')
 
     ms.set_current_mesh(2)
     section = os.path.join(work_dir, 'section.stl')
@@ -201,36 +235,42 @@ if args.hemi:
     left_subc = os.path.join(work_dir, 'left_subc.stl')
     ms.save_current_mesh(left_subc)
 
-    ## Close hole
-    def process_subc(subc_stl):
+    ## Close the cut
+    def process_splitted_subcortical(subc_stl):
         ms = pymeshlab.MeshSet()
         ms.load_new_mesh(section)
 
-        if (offset_x > 0 and subc_stl == right_subc) or (offset_x < 0 and subc_stl == left_subc):
+        # Check face orientation of section & invert face orientation if necessary
+        normals = ms.current_mesh().face_normal_matrix()[:, 0]
+        normals_negative = np.all(normals < 0)
+        if (normals_negative and subc_stl == left_subc) or (not normals_negative and subc_stl == right_subc):
             ms.invert_faces_orientation()
 
+        # Combine section & subcortical half
         ms.load_new_mesh(subc_stl)
         ms.flatten_visible_layers()
         ms.save_current_mesh(subc_stl)
 
-    process_subc(left_subc)
-    process_subc(right_subc)
+    process_splitted_subcortical(left_subc)
+    process_splitted_subcortical(right_subc)
 
-    # Smooth cortical model; Combine subcortical & cortical model of each hemisphere; clean edge between hemisspheres
-    def process_hemi(hemi_stl, subc_stl, opposing_subc):
+    # Smooth cortical model; Combine subcortical & cortical model of each hemisphere; clean edge between hemispheres
+    def process_hemi(hemi_stl, subc_stl, colat_subc):
         ms = pymeshlab.MeshSet()
         ms.load_new_mesh(hemi_stl)
+        ms.load_new_mesh(ventricle_stl)
+        ms.mesh_boolean_difference(first_mesh=0, second_mesh=1)
         ms.laplacian_smooth(stepsmoothnum=1)
         ms.load_new_mesh(subc_stl)
-        ms.mesh_boolean_union()
-        ms.load_new_mesh(opposing_subc)
-        ms.mesh_boolean_difference(first_mesh=2, second_mesh=3)
+        ms.mesh_boolean_union(first_mesh=2, second_mesh=3)
+        ms.load_new_mesh(colat_subc)
+        ms.mesh_boolean_difference(first_mesh=4, second_mesh=5)
         ms.save_current_mesh(hemi_stl)
 
     process_hemi(lh_stl, left_subc, right_subc)
     process_hemi(rh_stl, right_subc, left_subc)
 
-    # Clean hemissphere models
+    # Clean hemisphere models
     def clean_hemi(hemi_stl):
         ms = pymeshlab.MeshSet()
         ms.load_new_mesh(hemi_stl)
@@ -244,8 +284,12 @@ if args.hemi:
     ms = pymeshlab.MeshSet()
     ms.load_new_mesh(lh_stl)
     ms.load_new_mesh(rh_stl)
-    ms.mesh_boolean_difference()
-    ms.save_current_mesh(rh_stl)
+    if args.rev_overlap_correction:
+        ms.mesh_boolean_difference(first_mesh=0, second_mesh=1)
+        ms.save_current_mesh(lh_stl)
+    else:
+        ms.mesh_boolean_difference(first_mesh=1, second_mesh=0)
+        ms.save_current_mesh(rh_stl)
 
 #===========================================================#
 # CREATE MODEL FOR EACH CORTICAL PARCEL & LOBE
@@ -281,7 +325,7 @@ if args.parcels:
             os.system(f"mris_convert {parcel_surf} {parcel_mesh}")
             print(f"created STL file for {parcel_name.decode()}")
 
-    # Run pial2stl for each hemissphere
+    # Run pial2stl for each hemisphere
     pial2stl(lh_pial, 'lh')
     pial2stl(rh_pial, 'rh')
 
@@ -323,3 +367,17 @@ print('''
     #                SCRIPT FINISHED                 #
     #================================================#
 ''')
+
+if args.smooth:
+    print(f'## Smoothed subcortical model with {args.smooth} steps')
+
+if args.decimate:
+    print(f"## Decimated 'brain_final.stl' to {args.decimate} faces")
+
+if args.hemi:
+    print(f'## The subcortical model was split at x-planeoffset: {offset_x}')
+
+    if args.rev_overlap_correction:
+        print('## The right hemisphere is subtracted from the left hemisphere.')
+    else:
+        print('## The left hemisphere is subtracted from the right hemisphere.')

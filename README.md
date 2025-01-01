@@ -1,6 +1,6 @@
 # 3D-printable brain model from a T1w MR image using Docker
 
-You want to 3D print your or another ones brain? Here's a step by step guide on how to end up with a 3D-printable brain model. It's as easy as running two command lines. This is an adaptation and extension of [skjerns/3dprintedbrain_docker](https://github.com/skjerns/3dprintedbrain_docker) and [miykael/3dprintyourbrain](https://github.com/miykael/3dprintyourbrain) with more options, ease of use and better brainstem segmentation.
+You want to 3D print your or another ones brain? Here's a step by step guide on how to end up with a 3D-printable brain model. It's as easy as running two command lines. This is an adaptation and extension of [skjerns/3dprintedbrain_docker](https://github.com/skjerns/3dprintedbrain_docker) and [miykael/3dprintyourbrain](https://github.com/miykael/3dprintyourbrain) with more options, ease of use and enhanced anatomical accuracy.
 
 **What you need**
 - Structural brain image (T1-weighted) in NIfTI-format
@@ -8,12 +8,13 @@ You want to 3D print your or another ones brain? Here's a step by step guide on 
 - Installation of 'Docker Desktop' (see Instructions)
 
 # Features
-- Simplified installation and usage — just two commands to get started.
+- Simple installation and usage — just two commands to get started.
 - Compatible with pre-existing FreeSurfer [7.3+] output.
+- Enhanced anatomical accuracy by leveraging both FreeSurfer's recon-all and segment_subregions pipelines and by integrating ventricles.
 - Generates print-ready STL files for subcortical structures, cortical regions, and the whole brain.
-- Enhanced subcortical segmentation by leveraging both FreeSurfer's recon-all and segment_subregions processes.
-- Option to create separate STL files for each hemisphere.
+- Option to create a separate STL file for each hemisphere.
 - [BETA] Option to generate STL files for parcels of the Desikan-Killiany Atlas and brain lobes.
+- [BETA] Option to generate STL file for cerebral white matter.
 - Smaller Docker image (20.46 GB)
 - Technical feature: No longer requires FSL as a dependency.
 - Technical feature: Runs entirely from a single Python file
@@ -61,7 +62,7 @@ The default run will take several hours to complete.
 
 **Example for advanced use**
 
-This code is required if you want to e.g. skip FreeSurfer, use custom brainstem smoothing and obtain an STL file for each hemissphere:
+This code is required if you want to e.g. skip FreeSurfer, use custom brainstem smoothing and obtain an STL file for each hemisphere:
 - Mac/Linux: `docker run -t -v ./:/app/share lbutry/nii2stl -fs_skip -smoothing 0 -hemi`
 - Windows: `docker run -t -v .\/:/app/share lbutry/nii2stl -fs_skip -smoothing 0 -hemi`
 
@@ -84,9 +85,11 @@ This code is required if you want to e.g. skip FreeSurfer, use custom brainstem 
 
 **Optional modules**
 
-- `-hemi` Create STL-file for each hemissphere. Including brainstem, cerebellum and corpus callosum.
-- `-planeoffset` Indicate where the subcotical model is cut in half on the x-axis. Only applicable when -hemi is set.
+- `-hemi` Create STL-file for each hemisphere. Including brainstem, cerebellum and corpus callosum.
+    - `-planeoffset` Indicate where the subcotical model is cut in half on the x-axis. Only applicable when -hemi is set.
+    - `-rev_overlap_correction` Swap subtraction terms in hemi overlap correction. Only applicable when -hemi is set.
 - `-parcels` [BETA] Create STL-file for each parcel of the Desikan-Killiany Atlas and for each brain lobe.
+- `-wm` [BETA] Create STL-file for cerebral white matter.
 
 **General options**
 
@@ -101,7 +104,7 @@ All outputs are saved in the home directory.
 - `home/output/brain_final.stl` 3D-printable STL model of the whole brain.
 - `home/output/cortical_final.stl` 3D-printable STL model of the cerebrum.
 - `home/output/subcortical_final.stl` 3D-printable model of the brainstem and cerebellum.
-- `home/output/hemi/` 3D-printable STL model for both hemisspheres.
+- `home/output/hemi/` 3D-printable STL model for both hemispheres.
 - `home/output/lobes/` 3D-printable STL model for each brain lobe.
 - `home/output/parcels/` 3D-printable STL model for each parcel of the Desikan-Killiany Atlas.
 
