@@ -18,39 +18,23 @@ logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %
 parser = argparse.ArgumentParser()
 
 parser.add_argument('-t1w', type=str, help='Name of the T1w-image (.nii or .nii.gz) inside the home directory.')
-parser.add_argument('-fs_skip', action='store_true', help="Skip FreeSurfer's 'recon-all' and 'segment_subregion brainstem' pipeline. Requires FreeSurfer output to be located in home directory.")
-parser.add_argument('-fs_only_brainstem', action='store_true', help="Perform 'segment_subregion brainstem' and skip 'recon-all'. Requires FreeSurfer output to be located in home directory.")
+parser.add_argument('-fs_skip', action='store_true', help="Skip FreeSurfer's 'recon-all' pipeline. Checks if 'segment_subregion brainstem' needs to be run. Requires FreeSurfer output to be located in home directory.")
 parser.add_argument('-fs_flags', type=str, default = '', help="Parse more flags to 'recon-all'")
-parser.add_argument('-smooth', type=int, default = 150, help="Number of smoothing steps for subcortical model. Use '0' to disable")
-parser.add_argument('-decimate', type=float, default = 150000, help="Target number of faces. Use '0' to disable")
-parser.add_argument('-parcels', action='store_true', help='Create STL files for each parcel of the Desikan-Killiany Atlas and for each brain lobe.')
+parser.add_argument('-fs_dir', type=str, default = None, help="Name of FreeSurfer output directory. [Default: 'freesurfer']")
+parser.add_argument('-smooth', type=int, default = 150, help="Number of smoothing steps for subcortical model. Use '0' to disable. [Default: 150]")
+parser.add_argument('-decimate', type=float, default = 200000, help="Target number of faces. Use '0' to disable. [Default: 200000]")
 parser.add_argument('-hemi', action='store_true', help='Create STL files for each hemisphere.')
 parser.add_argument('-planeoffset', type=float, default=None, help='Indicate where the subcotical model is cut in half on the x-axis. Only applicable when -hemi is set.')
 parser.add_argument('-rev_overlap_correction', action='store_true', help='Indicate if hemi overlap correction should swap the subtraction terms.')
-parser.add_argument('-wm', action='store_true', help='Create STL file for cerebral white matter.')
 parser.add_argument('-work', action='store_true', help='Keep work directory.')
+parser.add_argument('-tag', type=str, default = None, help='Tag for the output folders. [Defaut: None]')
+
+## BETA arguments
+parser.add_argument('-wm', action='store_true', help='Create STL file for cerebral white matter.')
+parser.add_argument('-parcels', action='store_true', help='Create STL files for each parcel of the Desikan-Killiany Atlas and for each brain lobe.')
 
 args = parser.parse_args()
 
-# Validate arguments & files
-if not (args.fs_skip or args.fs_only_brainstem) and not args.t1w:
-    logging.error('The following arguments are required: -t1w (unless -fs_skip is set)')
-    sys.exit(1)
-
-if not os.path.exists('/app/share/license.txt'):
-    logging.error("The FreeSurfer's 'license.txt' file is missing in the home directory")
-    sys.exit(1)
-
-if args.fs_skip:
-    if not os.path.exists('/app/share/freesurfer/mri/brainstemSsLabels.FSvoxelSpace.mgz'):
-        logging.error("The folder 'freesurfer' is missing in the home directory or does not contain segmentation data from 'recon-all' & 'segment_subregions brainstem'")
-        sys.exit(1)
-
-if args.fs_only_brainstem:
-    if not os.path.exists('/app/share/freesurfer/surf/lh.pial'):
-        logging.error("The folder 'freesurfer' is missing in the home directory or does not contain segmentation data from 'recon-all'")
-        sys.exit(1)
-        
 #===========================================================#
 # CREATE WORK & OUTPUT DIRECTORY, SET ENV VARIABLES
 #===========================================================#
@@ -59,6 +43,16 @@ if args.fs_only_brainstem:
 share_dir  = os.path.join(os.getcwd(), 'share')
 work_dir   = os.path.join(share_dir, 'work')
 output_dir = os.path.join(share_dir, 'output')
+
+# Handle tag argument
+if args.tag:
+    work_dir = work_dir + '_' + args.tag
+    output_dir = output_dir + '_' + args.tag
+
+if not args.fs_dir:
+    args.fs_dir = 'freesurfer'
+    if args.tag:
+        args.fs_dir = args.fs_dir + '_' + args.tag
 
 # Create directories if they don't exist
 os.makedirs(work_dir, exist_ok=True)
@@ -69,6 +63,24 @@ os.environ['FS_LICENSE'] = '/app/share/license.txt'
 os.environ['SUBJECTS_DIR'] = share_dir
 
 #===========================================================#
+# VALIDATE ARGUMENTS & FILES
+#===========================================================#
+
+if not args.fs_skip and not args.t1w:
+    logging.error('The following arguments are required: -t1w (unless -fs_skip is set)')
+    sys.exit(1)
+
+if not os.path.exists('/app/share/license.txt'):
+    logging.error("The FreeSurfer's 'license.txt' file is missing in the home directory")
+    sys.exit(1)
+
+if args.fs_skip:
+    required_files = [f'/app/share/{args.fs_dir}/surf/lh.pial', f'/app/share/{args.fs_dir}/surf/rh.pial', f'/app/share/{args.fs_dir}/mri/aseg.mgz']
+    if any(not os.path.exists(file) for file in required_files):
+        logging.error("The FreeSurfer output folder is missing in the home directory or does not contain segmentation data from 'recon-all'.")
+        sys.exit(1)
+        
+#===========================================================#
 # RUN FREESURFER RECON-ALL & SEGMENT_SUBREGIONS
 #===========================================================#
 
@@ -77,11 +89,15 @@ if not args.fs_skip:
     print('## RUN RECON-ALL & SEGMENT_SUBREGIONS ##')
     print(f'## INPUT FILE: {args.t1w} ##')    
 
-    os.system(f'recon-all -i share/{args.t1w} -subjid freesurfer -nuintensitycor -all {args.fs_flags} -parallel')
-    os.system('segment_subregions brainstem --cross freesurfer')
+    os.system(f'recon-all -i share/{args.t1w} -subjid {args.fs_dir} -nuintensitycor -all {args.fs_flags} -parallel')
+    os.system(f'segment_subregions brainstem --cross {args.fs_dir}')
 
-if args.fs_only_brainstem:
-    os.system('segment_subregions brainstem --cross freesurfer')
+if args.fs_skip:
+    print('## SKIP RECON-ALL ##')
+
+    if not os.path.exists(f'/app/share/{args.fs_dir}/mri/brainstemSsLabels.FSvoxelSpace.mgz'):
+        print('## BRAINSTEM SEGMENTATION MISSING IN FREESURFER OUTPUT. RUNNING SEGMENT_SUBREGIONS: ##')
+        os.system(f'segment_subregions brainstem --cross {args.fs_dir}')
 
 #===========================================================#
 # CREATE CORTICAL MODEL
@@ -89,8 +105,8 @@ if args.fs_only_brainstem:
 
 print('## CREATE CORTICAL AND SUBCORTICAL MODEL ##')
 
-lh_pial = os.path.join(share_dir, 'freesurfer/surf/lh.pial')
-rh_pial = os.path.join(share_dir, 'freesurfer/surf/rh.pial')
+lh_pial = os.path.join(share_dir, f'{args.fs_dir}/surf/lh.pial')
+rh_pial = os.path.join(share_dir, f'{args.fs_dir}/surf/rh.pial')
 cortical_stl = os.path.join(output_dir, 'cortical_final.stl')
 os.system(f'mris_convert --combinesurfs {lh_pial} {rh_pial} {cortical_stl}')
 
@@ -109,15 +125,15 @@ def mgz2stl(input_mgz, output_prefix, match_values):
 
 # Cerebellum, Thalamus, VentralDC, Fornix, Corpus callosum
 sub_stl = os.path.join(work_dir, 'sub.stl')
-mgz2stl('freesurfer/mri/aseg.mgz', 'sub', '6 7 8 10 28 45 46 47 49 60 250 251 252 253 254 255')
+mgz2stl(f'{args.fs_dir}/mri/aseg.mgz', 'sub', '6 7 8 10 28 45 46 47 49 60 250 251 252 253 254 255')
 
 # Brainstem
 brainstem_stl = os.path.join(work_dir, 'brainstem.stl')
-mgz2stl('freesurfer/mri/brainstemSsLabels.FSvoxelSpace.mgz', 'brainstem', '170 171 172 173 174 175 177 178 179')
+mgz2stl(f'{args.fs_dir}/mri/brainstemSsLabels.FSvoxelSpace.mgz', 'brainstem', '170 171 172 173 174 175 177 178 179')
 
 ## Ventricels (for subtraction)
-ventricle_stl = os.path.join(work_dir, 'ventrical.stl')
-mgz2stl('freesurfer/mri/aseg.mgz', 'ventrical', '4 14 15 43 72')
+ventricle_stl = os.path.join(work_dir, 'ventricles.stl')
+mgz2stl(f'{args.fs_dir}/mri/aseg.mgz', 'ventricles', '4 14 15 43 72')
 
 #===========================================================#
 # MESH PROCESSING VIA PYMESHLAB
@@ -158,12 +174,14 @@ ms = pymeshlab.MeshSet()
 ms.load_new_mesh(cortical_stl)
 ms.load_new_mesh(ventricle_stl)
 ms.mesh_boolean_difference(first_mesh=0, second_mesh=1)
-ms.laplacian_smooth(stepsmoothnum=1)
+ms.laplacian_smooth(stepsmoothnum=2)
 ms.save_current_mesh(cortical_stl)
 
 # Combine subcortical & cortical model
+ms = pymeshlab.MeshSet()
+ms.load_new_mesh(cortical_stl)
 ms.load_new_mesh(subcortical_stl)
-ms.mesh_boolean_union()
+ms.flatten_visible_layers()
 
 # Decimate combined model
 if args.decimate:
@@ -189,7 +207,7 @@ if args.wm:
     
     # Create WM model
     wm_stl = os.path.join(work_dir, 'wm.stl')
-    mgz2stl('freesurfer/mri/aseg.mgz', 'wm', '2 41 250 251 252 253 254 255')
+    mgz2stl(f'{args.fs_dir}/mri/aseg.mgz', 'wm', '2 41 250 251 252 253 254 255')
 
     # Process mesh
     process_mesh(wm_stl)
@@ -260,7 +278,7 @@ if args.hemi:
         ms.load_new_mesh(hemi_stl)
         ms.load_new_mesh(ventricle_stl)
         ms.mesh_boolean_difference(first_mesh=0, second_mesh=1)
-        ms.laplacian_smooth(stepsmoothnum=1)
+        ms.laplacian_smooth(stepsmoothnum=2)
         ms.load_new_mesh(subc_stl)
         ms.mesh_boolean_union(first_mesh=2, second_mesh=3)
         ms.load_new_mesh(colat_subc)
@@ -310,7 +328,7 @@ if args.parcels:
     # Function to parcellate .pial & convert to .stl
     def pial2stl(pial_file, hemi):
         vertices, faces = fsio.read_geometry(pial_file)
-        annot = os.path.join(share_dir, f"freesurfer/label/{hemi}.aparc.annot")
+        annot = os.path.join(share_dir, f"{args.fs_dir}/label/{hemi}.aparc.annot")
         labels, ctab, names = fsio.read_annot(annot)
 
         # Loop over all parcels in names

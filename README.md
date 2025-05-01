@@ -10,13 +10,13 @@ You want to 3D print your or another ones brain? Here's a step by step guide on 
 # Features
 - Simple installation and usage — just two commands to get started.
 - Compatible with pre-existing FreeSurfer [7.3+] output.
-- Enhanced anatomical accuracy by leveraging both FreeSurfer's recon-all and segment_subregions pipelines and by integrating ventricles.
+- Enhanced anatomical accuracy by leveraging both FreeSurfer's recon-all and segment_subregions pipelines, and by integrating ventricles.
 - Generates print-ready STL files for subcortical structures, cortical regions, and the whole brain.
 - Option to create a separate STL file for each hemisphere.
 - [BETA] Option to generate STL files for parcels of the Desikan-Killiany Atlas and brain lobes.
 - [BETA] Option to generate STL file for cerebral white matter.
 - Smaller Docker image (20.46 GB)
-- Technical feature: No longer requires FSL as a dependency.
+- Technical feature: No longer requires FSL as a dependency (saving 10 GB of space).
 - Technical feature: Runs entirely from a single Python file
 
 # Instructions
@@ -74,8 +74,8 @@ This code is required if you want to e.g. skip FreeSurfer, use custom brainstem 
 
 **Freesurfer options**
 
-- `-fs_skip` Skip FreeSurfer's 'recon-all' and 'segment_subregion brainstem' pipeline. Requires FreeSurfer output to be located in home directory.
-- `-fs_only_brainstem` Perform 'segment_subregion brainstem' and skip 'recon-all'. Requires FreeSurfer output to be located in home directory.
+- `-fs_skip` Skip FreeSurfer's 'recon-all' pipeline. Checks if 'segment_subregion brainstem' needs to be run. Requires FreeSurfer output to be located in home directory.
+- `-fs_dir <folder name>` Name of FreeSurfer output directory. [Default = freesurfer]"
 - `-fs_flags <flags>` Parse more flags to 'recon-all'.
 
 **Mesh processing options**
@@ -94,27 +94,29 @@ This code is required if you want to e.g. skip FreeSurfer, use custom brainstem 
 **General options**
 
 - `-work` Keep work directory. 
-
+- `-tag <tag>` Tag for the FreeSurfer and output folder. [Defaut: None]
 
 ### Output
 
-All outputs are saved in the home directory.
+All outputs are saved in the home directory. If `-tag` is set, `_<tag>` is appended to the output and FreeSurfer folder.
 
-- `home/freesurfer/` Segmentation output of FreeSurfer.
+- `home/freesurfer/...` Segmentation output of FreeSurfer.
 - `home/output/brain_final.stl` 3D-printable STL model of the whole brain.
 - `home/output/cortical_final.stl` 3D-printable STL model of the cerebrum.
 - `home/output/subcortical_final.stl` 3D-printable model of the brainstem and cerebellum.
-- `home/output/hemi/` 3D-printable STL model for both hemispheres.
-- `home/output/lobes/` 3D-printable STL model for each brain lobe.
-- `home/output/parcels/` 3D-printable STL model for each parcel of the Desikan-Killiany Atlas.
+- `home/output/hemi/...` 3D-printable STL model for both hemispheres.
+- `home/output/lobes/...` 3D-printable STL model for each brain lobe.
+- `home/output/parcels/...` 3D-printable STL model for each parcel of the Desikan-Killiany Atlas.
 
 # Q & A
 
-1) My MR images are in DICOM format and not in .nii or nii.gz.
+**Q1: My MR images are in DICOM format and not in .nii or nii.gz.**
 - You can convert DICOM to NIfTI using [dcm2niix](https://github.com/rordenlab/dcm2niix).
 
-2) I already have the output of FreeSurfer 'recon-all' and 'segment_subregion brainstem'. How can I use it?
-- Copy the output to the home directory and rename it to 'freesurfer'. You should now use the '-fs_skip' flag.
+**Q2: I already have the output of FreeSurfer 'recon-all'. How can I use it?**
+- Copy the output to the home directory
+- Now you have two options: (1) Rename it to 'freesurfer' or 'freesurfer_<tag>' when using the `-tag` option. (2) Use the `-fs_dir` flag to specify the name of your FreeSurfer output directory.
+- Use the `-fs_skip` option to skip the 'recon-all' pipeline.
 
-3) I already have the output of FreeSurfer 'recon-all' but not of 'segment_subregion brainstem'. 
+**Q3: I already have the output of FreeSurfer 'recon-all' but not of 'segment_subregion brainstem'.**
 - Copy the output to the home directory and rename it to 'freesurfer'. You should now use the '-fs_only_brainstem' flag.
