@@ -29,10 +29,16 @@ parser.add_argument('-planeoffset', type=float, default=None, help='Indicate whe
 parser.add_argument('-rev_overlap_correction', action='store_true', help='Indicate if hemi overlap correction should swap the subtraction terms.')
 parser.add_argument('-wm', action='store_true', help='Create STL file for cerebral white matter.')
 parser.add_argument('-work', action='store_true', help='Keep work directory.')
+parser.add_argument('-stand', action='store_true', help='Create stand')
 
 args = parser.parse_args()
 
 # Validate arguments & files
+if args.stand:
+    print('## Create model stand. SKIP EVERYTHING ELSE. ##')
+    os.system('python3 stand.py')
+    sys.exit()
+
 if not (args.fs_skip or args.fs_only_brainstem) and not args.t1w:
     logging.error('The following arguments are required: -t1w (unless -fs_skip is set)')
     sys.exit(1)
@@ -116,8 +122,8 @@ brainstem_stl = os.path.join(work_dir, 'brainstem.stl')
 mgz2stl('freesurfer/mri/brainstemSsLabels.FSvoxelSpace.mgz', 'brainstem', '170 171 172 173 174 175 177 178 179')
 
 ## Ventricels (for subtraction)
-ventricle_stl = os.path.join(work_dir, 'ventrical.stl')
-mgz2stl('freesurfer/mri/aseg.mgz', 'ventrical', '4 14 15 43 72')
+ventricle_stl = os.path.join(work_dir, 'ventricles.stl')
+mgz2stl('freesurfer/mri/aseg.mgz', 'ventricles', '4 14 15 43 72')
 
 #===========================================================#
 # MESH PROCESSING VIA PYMESHLAB
@@ -158,7 +164,7 @@ ms = pymeshlab.MeshSet()
 ms.load_new_mesh(cortical_stl)
 ms.load_new_mesh(ventricle_stl)
 ms.mesh_boolean_difference(first_mesh=0, second_mesh=1)
-ms.laplacian_smooth(stepsmoothnum=1)
+ms.laplacian_smooth(stepsmoothnum=2)
 ms.save_current_mesh(cortical_stl)
 
 # Combine subcortical & cortical model

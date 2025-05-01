@@ -13,6 +13,8 @@ WORKDIR /app
 
 # Copy scripts to working directory
 COPY main.py .
+COPY stand.py .
+COPY stand_template.stl .
 
 # Specify the command to run the Python script
 ENTRYPOINT ["python3", "main.py"]
