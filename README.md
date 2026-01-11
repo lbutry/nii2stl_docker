@@ -75,7 +75,7 @@ All options are listed at section [Arguments and options](#arguments-and-options
 - Mac/Linux: `docker run -t -v ./:/app/share lbutry/nii2stl -fs_skip -smoothing 0 -hemi`
 - Windows: `docker run -t -v .\/:/app/share lbutry/nii2stl -fs_skip -smoothing 0 -hemi`
 
-## Arguments and options
+# Arguments and options
 
 **General options**
 
@@ -95,18 +95,18 @@ All options are listed at section [Arguments and options](#arguments-and-options
 - `-fs_dir <folder name>` Name of FreeSurfer output directory. [Default = freesurfer]"
 - `-fs_flags <flags>` Parse more flags to [recon-all](https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all).
 
+**Optional modules**
+
+- `-hemi` Create STL-file for each hemisphere. Including brainstem, cerebellum and corpus callosum.
+- `-parcels` [BETA] Create STL-file for each parcel of the Desikan-Killiany Atlas and for each brain lobe.
+- `-wm` [BETA] Create STL-file for cerebral white matter.
+
 **Mesh processing options**
 
 - `-smooth <int>` Number of smoothing steps for subcortical model. Use '0' to disable. [Default = 150]
 - `-decimate <float>` Target number of faces. Use '0' to disable. [Default = 200000]
-
-**Optional modules**
-
-- `-hemi` Create STL-file for each hemisphere. Including brainstem, cerebellum and corpus callosum.
 - `-planeoffset` Indicate where the subcotical model is cut in half on the x-axis. Only applicable when -hemi is set.
 - `-rev_overlap_correction` Swap subtraction terms in hemi overlap correction. Only applicable when -hemi is set.
-- `-parcels` [BETA] Create STL-file for each parcel of the Desikan-Killiany Atlas and for each brain lobe.
-- `-wm` [BETA] Create STL-file for cerebral white matter.
 
 ## Output
 
@@ -128,8 +128,8 @@ All outputs are saved in the home directory.
 **Q2: I already have the output of FreeSurfer's 'recon-all'. How can I use it?**
 1) Copy the FreeSurfer output folder to the home directory.
 2) Now you have two options: 
-    (a) Rename the folder to 'freesurfer' or 'freesurfer_<tag>' when using the `-tag` flag. 
-    (b) Use the `-fs_dir` flag to specify the name of your FreeSurfer output directory.
+    - (a) Rename the folder to 'freesurfer' (or 'freesurfer_>tag<' when using the `-tag` flag).
+    - (b) Use the `-fs_dir` flag to specify the name of your FreeSurfer output directory.
 3) Use the `-fs_skip` option to skip the 'recon-all' pipeline.
 
 **Q3: I already have the output of FreeSurfer 'recon-all' but not of 'segment_subregion brainstem'.**
