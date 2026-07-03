@@ -41,8 +41,8 @@ args = parser.parse_args()
 
 # Set directories paths (inside share folder between docker & host)
 share_dir  = os.path.join(os.getcwd(), 'share')
-work_dir   = os.path.join(share_dir, 'work')
 output_dir = os.path.join(share_dir, 'output')
+work_dir   = os.path.join(output_dir, 'work')
 
 # Handle tag argument
 if args.tag:
@@ -194,28 +194,7 @@ ms.remove_isolated_pieces_wrt_diameter()
 # Save final model
 final_stl = os.path.join(output_dir, 'brain_final.stl')
 ms.save_current_mesh(final_stl)
-
-#===========================================================#
-# CREATE MODEL FOR WHITE MATTER
-#===========================================================#
-
-if args.wm:
-
-    # Create output folder
-    wm_dir = os.path.join(output_dir, 'wm')
-    os.makedirs(wm_dir, exist_ok=True)
-    
-    # Create WM model
-    wm_stl = os.path.join(work_dir, 'wm.stl')
-    mgz2stl(f'{args.fs_dir}/mri/aseg.mgz', 'wm', '2 41 250 251 252 253 254 255')
-
-    # Process mesh
-    process_mesh(wm_stl)
-    ms = pymeshlab.MeshSet()
-    ms.load_new_mesh(wm_stl)
-    ms.scaledependent_laplacian_smooth(stepsmoothnum=120, delta=pymeshlab.Percentage(0.))
-    wm_final = os.path.join(wm_dir, 'wm.stl')
-    ms.save_current_mesh(wm_final)
+whole_brain_mesh = ms.current_mesh()
 
 #===========================================================#
 # CREATE MODEL FOR EACH HEMISPHERE
@@ -235,8 +214,9 @@ if args.hemi:
     os.system(f'mris_convert {lh_pial}  {lh_stl}')
     os.system(f'mris_convert {rh_pial}  {rh_stl}')
 
-    # Get value for 'planeoffset' argument (middle of whole brain model)
-    offset_x = args.planeoffset if args.planeoffset is not None else ms.compute_geometric_measures()['center_of_mass'][0]
+    # Get value for 'planeoffset' argument (middle whole brain model)
+    bbox = whole_brain_mesh.bounding_box()
+    offset_x = args.planeoffset if args.planeoffset is not None else (bbox.min()[0] + bbox.max()[0]) / 2 
 
     # Split subcortical model in half
     ms = pymeshlab.MeshSet()
@@ -368,6 +348,28 @@ if args.parcels:
 
             ms.flatten_visible_layers()
             ms.save_current_mesh(os.path.join(lobes_dir, f'{hemi}_lobe-{lobe_name}.stl'))
+
+#===========================================================#
+# CREATE MODEL FOR WHITE MATTER
+#===========================================================#
+
+if args.wm:
+
+    # Create output folder
+    wm_dir = os.path.join(output_dir, 'wm')
+    os.makedirs(wm_dir, exist_ok=True)
+    
+    # Create WM model
+    wm_stl = os.path.join(work_dir, 'wm.stl')
+    mgz2stl(f'{args.fs_dir}/mri/aseg.mgz', 'wm', '2 41 250 251 252 253 254 255')
+
+    # Process mesh
+    process_mesh(wm_stl)
+    ms = pymeshlab.MeshSet()
+    ms.load_new_mesh(wm_stl)
+    ms.scaledependent_laplacian_smooth(stepsmoothnum=120, delta=pymeshlab.Percentage(0.))
+    wm_final = os.path.join(wm_dir, 'wm.stl')
+    ms.save_current_mesh(wm_final)
 
 #===========================================================#
 # TIDY UP
